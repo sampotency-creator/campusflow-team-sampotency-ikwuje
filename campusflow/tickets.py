@@ -121,3 +121,84 @@ def create_ticket(title, category, urgency, affected_users, ticket_number):
     }
 
     return ticket
+
+def get_ticket_input(ticket_number):
+    """Collect ticket details from the user and create a ticket."""
+
+    print("\n--- CREATE NEW TICKET ---")
+
+    title = input("Enter ticket title: ")
+    category = input(
+        "Enter category (Network/Hardware/Software/Other): "
+    )
+    urgency = input("Enter urgency (low/medium/high): ")
+    affected_users_text = input("Enter number of affected users: ")
+
+    try:
+        affected_users = int(affected_users_text)
+
+        ticket = create_ticket(
+            title=title,
+            category=category,
+            urgency=urgency,
+            affected_users=affected_users,
+            ticket_number=ticket_number,
+        )
+
+    except ValueError as error:
+        print(f"\nTicket not created: {error}")
+        return None
+
+    print("\nTicket created successfully!")
+
+    for key, value in ticket.items():
+        print(f"{key.replace('_', ' ').title()}: {value}")
+
+    return ticket
+
+
+def create_multiple_tickets():
+    """Allow the user to create multiple tickets in one session."""
+
+    tickets = []
+    next_ticket_number = 1
+
+    while True:
+        ticket = get_ticket_input(next_ticket_number)
+
+        if ticket is not None:
+            tickets.append(ticket)
+            next_ticket_number += 1
+
+        while True:
+            answer = input(
+                "\nCreate another ticket? (yes/no): "
+            ).strip().lower()
+
+            if answer in {"yes", "no"}:
+                break
+
+            print("Please enter yes or no.")
+
+        if answer == "no":
+            break
+
+    print("\n--- SESSION SUMMARY ---")
+    print(f"Tickets created in this session: {len(tickets)}")
+
+    for ticket in tickets:
+        print(
+            f"{ticket['id']} | "
+            f"{ticket['title']} | "
+            f"{ticket['priority']}"
+        )
+
+    return tickets
+
+
+if __name__ == "__main__":
+    print("=" * 40)
+    print("CAMPUSFLOW HELP DESK")
+    print("=" * 40)
+
+    create_multiple_tickets()
