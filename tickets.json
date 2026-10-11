@@ -1,0 +1,12 @@
+[
+    {
+        "id": "T001",
+        "title": "network is not working",
+        "category": "network",
+        "urgency": "high",
+        "affected_users": 15,
+        "priority": "critical",
+        "status": "in_progress",
+        "assigned_to": "IKWUJE"
+    }
+]
