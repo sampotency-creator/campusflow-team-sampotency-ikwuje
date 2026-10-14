@@ -4,6 +4,13 @@ import json
 import re
 from pathlib import Path
 
+from campusflow.history import (
+    HistoryError,
+    create_event,
+    load_events,
+    save_events,
+    display_ticket_history,
+)
 
 # --------------------------------------------------
 # FILE LOCATION AND CONSTANTS
@@ -37,6 +44,38 @@ PRIORITY_ORDER = {
 
 class StorageError(Exception):
     """Raised when ticket data cannot safely be loaded or saved."""
+
+
+
+def _prepare_operation_event(
+    events,
+    ticket_id,
+    action,
+    actor,
+    details,
+):
+
+    """Prepare an event before mutating a ticket."""
+
+    if events is None:
+        return None
+
+    if not isinstance(events, list):
+        raise ValueError("Event history must be a list.")
+
+    return create_event(
+        ticket_id=ticket_id,
+        action=action,
+        actor=actor,
+        details=details,
+    )
+
+
+def _append_operation_event(events, event):
+    """Append an already-prepared event after an operation succeeds."""
+
+    if events is not None and event is not None:
+        events.append(event)
 
 
 # --------------------------------------------------
@@ -146,11 +185,19 @@ def find_ticket(tickets, ticket_id):
 # F3 - ASSIGN TICKETS
 # --------------------------------------------------
 
-def assign_ticket(tickets, ticket_id, staff_name):
+def assign_ticket(
+    tickets,
+    ticket_id,
+    staff_name,
+    events=None,
+    actor="system",
+):
     """
     Assign a ticket to a staff member.
 
-    Return True when assignment succeeds; otherwise return False.
+    Return True on success and False on failure.
+
+    When events is provided, record the successful assignment.
     """
 
     ticket = find_ticket(tickets, ticket_id)
@@ -164,8 +211,22 @@ def assign_ticket(tickets, ticket_id, staff_name):
     if not isinstance(staff_name, str) or not staff_name.strip():
         return False
 
-    # Remove unnecessary spaces around the staff member's name.
-    ticket["assigned_to"] = staff_name.strip()
+    new_assignee = staff_name.strip()
+
+    event = _prepare_operation_event(
+        events=events,
+        ticket_id=ticket["id"],
+        action="TICKET_ASSIGNED",
+        actor=actor,
+        details={
+            "previous_assignee": ticket["assigned_to"],
+            "assigned_to": new_assignee,
+        },
+    )
+
+    ticket["assigned_to"] = new_assignee
+
+    _append_operation_event(events, event)
 
     return True
 
@@ -174,16 +235,22 @@ def assign_ticket(tickets, ticket_id, staff_name):
 # F4 - CHANGE TICKET STATUS
 # --------------------------------------------------
 
-def change_ticket_status(tickets, ticket_id, new_status):
+def change_ticket_status(
+    tickets,
+    ticket_id,
+    new_status,
+    events=None,
+    actor="system",
+):
+
     """
-    Change a ticket's status when the requested transition is allowed.
+    Change status only when the transition is permitted.
 
     Allowed transitions:
-        open -> in_progress (only when assigned)
+        open -> in_progress, when assigned
         in_progress -> resolved
 
-    A resolved ticket must be explicitly reopened before further work.
-    Return True if the change succeeds; otherwise return False.
+    A resolved ticket must be reopened before work starts again.
     """
 
     ticket = find_ticket(tickets, ticket_id)
@@ -204,31 +271,65 @@ def change_ticket_status(tickets, ticket_id, new_status):
 
     current_status = ticket["status"]
 
-    # An open ticket can start work only if it has an assignee.
+
+    # An open ticket can start work only if it is assigned.
+
+
     if current_status == "open" and new_status == "in_progress":
         assigned_to = ticket["assigned_to"]
 
         if not isinstance(assigned_to, str) or not assigned_to.strip():
             return False
 
-        ticket["status"] = "in_progress"
+        event = _prepare_operation_event(
+            events=events,
+            ticket_id=ticket["id"],
+            action="STATUS_CHANGED",
+            actor=actor,
+            details={
+                "from": current_status,
+                "to": new_status,
+            },
+        )
+
+        ticket["status"] = new_status
+
+        _append_operation_event(events, event)
+
         return True
 
-    # An in-progress ticket can be resolved.
+    # Only an in-progress ticket can be resolved.
+
     if current_status == "in_progress" and new_status == "resolved":
-        ticket["status"] = "resolved"
+        event = _prepare_operation_event(
+            events=events,
+            ticket_id=ticket["id"],
+            action="STATUS_CHANGED",
+            actor=actor,
+            details={
+                "from": current_status,
+                "to": new_status,
+            },
+        )
+
+        ticket["status"] = new_status
+
+        _append_operation_event(events, event)
+
         return True
 
-    # All other direct transitions are prohibited.
+    # Reject every other transition.
+
     return False
 
 
-def reopen_ticket(tickets, ticket_id):
-    """
-    Reopen a resolved ticket by changing its status to open.
-
-    Return True if reopening succeeds; otherwise return False.
-    """
+def reopen_ticket(
+    tickets,
+    ticket_id,
+    events=None,
+    actor="system",
+):
+    """Reopen a resolved ticket and record the successful operation."""
 
     ticket = find_ticket(tickets, ticket_id)
 
@@ -241,10 +342,22 @@ def reopen_ticket(tickets, ticket_id):
     if ticket["status"] != "resolved":
         return False
 
+    event = _prepare_operation_event(
+        events=events,
+        ticket_id=ticket["id"],
+        action="TICKET_REOPENED",
+        actor=actor,
+        details={
+            "from": "resolved",
+            "to": "open",
+        },
+    )
+
     ticket["status"] = "open"
 
-    return True
+    _append_operation_event(events, event)
 
+    return True
 
 # --------------------------------------------------
 # F5 - WORK QUEUE
