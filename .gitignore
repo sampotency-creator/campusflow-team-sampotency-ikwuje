@@ -1,3 +1,6 @@
 __pycache__/
 *.py[cod]
-.pytest_cache/
+.pytest_cache/lab_sessions/
+events.json
+__pycache__/
+*.pyc
