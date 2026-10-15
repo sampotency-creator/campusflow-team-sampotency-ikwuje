@@ -16,10 +16,10 @@ from campusflow.workflow import (
 )
 
 SLA_HOURS = {
-    "critical": 4,
-    "high": 8,
+    "critical": 1,
+    "high": 4,
     "medium": 24,
-    "low": 72,
+    "low": 48,
 }
 
 UNRESOLVED = {"open", "in_progress"}
