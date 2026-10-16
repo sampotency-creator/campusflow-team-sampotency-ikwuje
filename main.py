@@ -224,7 +224,7 @@ MENU = [
 
 def display_menu():
     print("\n" + "=" * 42)
-    print("          CAMPUSFLOW HELP DESK")
+    print("          CAMPUSFLOW PRO HELP DESK")
     print("=" * 42)
 
     for number, label in MENU:

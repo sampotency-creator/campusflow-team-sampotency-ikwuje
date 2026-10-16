@@ -11,9 +11,8 @@ VALID_URGENCIES = {
     "high",
 }
 
-
 def validate_title(title):
-    """Check that the ticket title is not empty."""
+    """Check that the ticket title is meaningful text."""
 
     if not isinstance(title, str):
         raise ValueError("Title must be text.")
@@ -23,8 +22,13 @@ def validate_title(title):
     if not title:
         raise ValueError("Title cannot be empty.")
 
-    return title
+    if not any(character.isalpha() for character in title):
+        raise ValueError(
+            "Title must contain at least one letter, "
+            "for example 'WiFi down in Block B'."
+        )
 
+    return title
 
 def validate_category(category):
     """Check that the category is supported."""
@@ -71,6 +75,7 @@ def validate_affected_users(affected_users):
     return affected_users
 
 def calculate_priority(urgency, affected_users):
+    
     """Calculate a ticket's priority using the agreed rules."""
 
     urgency = validate_urgency(urgency)
@@ -122,32 +127,63 @@ def create_ticket(title, category, urgency, affected_users, ticket_number):
 
     return ticket
 
+
+def ask_until_valid(prompt, validator, converter=None):
+    """Keep asking until the validator accepts the answer."""
+
+    while True:
+
+        answer = input(prompt)
+
+        try:
+            if converter is not None:
+                answer = converter(answer)
+
+            return validator(answer)
+
+        except ValueError as error:
+            print(f"Invalid input: {error} Please try again.\n")
+
+
+def to_whole_number(text):
+
+    """Convert typed text to an int, with a friendly error."""
+
+    try:
+        return int(text.strip())
+    except ValueError:
+        raise ValueError("Enter a whole number such as 5.") from None
+
+
+
 def get_ticket_input(ticket_number):
     """Collect ticket details from the user and create a ticket."""
 
-    print("\n--- CREATE NEW TICKET ---")
-
-    title = input("Enter ticket title: ")
-    category = input(
-        "Enter category (Network/Hardware/Software/Other): "
+    title = ask_until_valid(
+        "Enter ticket title: ",
+        validate_title,
     )
-    urgency = input("Enter urgency (low/medium/high): ")
-    affected_users_text = input("Enter number of affected users: ")
+    category = ask_until_valid(
+        "Enter category (Network/Hardware/Software/Other): ",
+        validate_category,
+    )
+    urgency = ask_until_valid(
+        "Enter urgency (low/medium/high): ",
+        validate_urgency,
+    )
+    affected_users = ask_until_valid(
+        "Enter number of affected users: ",
+        validate_affected_users,
+        converter=to_whole_number,
+    )
 
-    try:
-        affected_users = int(affected_users_text)
-
-        ticket = create_ticket(
-            title=title,
-            category=category,
-            urgency=urgency,
-            affected_users=affected_users,
-            ticket_number=ticket_number,
-        )
-
-    except ValueError as error:
-        print(f"\nTicket not created: {error}")
-        return None
+    ticket = create_ticket(
+        title=title,
+        category=category,
+        urgency=urgency,
+        affected_users=affected_users,
+        ticket_number=ticket_number,
+    )
 
     print("\nTicket created successfully!")
 
